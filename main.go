@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/go-redis/redis"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ func init() {
 	flag.StringVar(&host_port,"h", "127.0.0.1:6379", "-h [ip:port]")
 	flag.StringVar(&pwd,"a", "", "- [password]")
 	flag.IntVar(&db,"db", 0, "-db [number]")
-	flag.StringVar(&action,"act", "test", "-action [get_key::key|del_key::key]")
+	flag.StringVar(&action,"act", "test", "-action [get_keys|del_keys|hgetall_keys|lrange_keys::key]")
 }
 
 func getRedisClient(address string, password string, db int) *redis.Client{
@@ -62,10 +63,13 @@ func main() {
 	}
 	if action == "" {
 		fmt.Println("need action ")
+		flag.Usage()
 		return
 	}
 	//fmt.Println(action)
 	client := getRedisClient(host_port, pwd, db)
+	defer 	client.Close()
+
 	arr := parserAction(action)
 	switch arr[0] {
 	case "test":
@@ -74,7 +78,7 @@ func main() {
 		fmt.Println("db:", db)
 		fmt.Println("action:", action)
 
-	case "del_key":
+	case "del_keys":
 		keys := arr[1]
 		keys_arr :=client.Keys(keys).Val()
 		for _, key := range keys_arr{
@@ -96,7 +100,7 @@ func main() {
 			fmt.Println("set", key, "done")
 		}
 
-	case "get_key":
+	case "get_keys":
 		keys := arr[1]
 		keys_arr :=client.Keys(keys).Val()
 		for _, key := range keys_arr{
@@ -109,10 +113,33 @@ func main() {
 
 		}
 
+	case "hgetall_keys":
+		keys := arr[1]
+		keys_arr :=client.Keys(keys).Val()
+		for _, key := range keys_arr{
+			res, err := client.HGetAll(key).Result()
+			if err != nil{
+				fmt.Println(err.Error())
+			}else{
+				fmt.Println(res)
+			}
+		}
+
+	case "lrange_keys":
+		keys := arr[1]
+		start,_ := strconv.ParseInt(arr[2], 64, 64)
+		stop,_ := strconv.ParseInt(arr[3], 64, 64)
+		keys_arr :=client.Keys(keys).Val()
+		for _, key := range keys_arr{
+			res, err := client.LRange(key, start, stop).Result()
+			if err != nil{
+				fmt.Println(err.Error())
+			}else{
+				fmt.Println(res)
+			}
+		}
+
 	default:
 		fmt.Println("not support action")
-
 	}
-
-	client.Close()
 }
